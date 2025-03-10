@@ -1,0 +1,22 @@
+﻿syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+option csharp_namespace = "Mice_server";
+package message;
+
+service MessageService {
+  rpc SendMessage(Message) returns (stream Message);
+}
+
+message Message {
+  string userId = 1;
+  string content = 2;
+  google.protobuf.Timestamp sent_date = 3;
+}
+
+// can be reused later
+//message Reply {
+//  string userId = 1;
+//  string content = 2;
+//  google.protobuf.Timestamp sent_date = 3;
+//}
