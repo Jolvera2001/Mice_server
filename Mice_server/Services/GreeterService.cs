@@ -1,22 +1,22 @@
+using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Mice_server;
 
 namespace Mice_server.Services;
 
-public class GreeterService : Greeter.GreeterBase
+public class GreeterService(ILogger<GreeterService> logger) : MessageService.MessageServiceBase
 {
-    private readonly ILogger<GreeterService> _logger;
-
-    public GreeterService(ILogger<GreeterService> logger)
+    public override async Task SendMessage(Message request, IServerStreamWriter<Message> responseStream, ServerCallContext context)
     {
-        _logger = logger;
-    }
+        logger.LogInformation($"Received message from: {request.UserId}");
 
-    public override Task<HelloReply> SayHello(HelloRequest request, ServerCallContext context)
-    {
-        return Task.FromResult(new HelloReply
+        var response = new Message
         {
-            Message = "Hello " + request.Name
-        });
+            UserId = Guid.NewGuid().ToString(),
+            Content = $"Welcome to the Mice Server {request.UserId}",
+            SentDate = Timestamp.FromDateTime(DateTime.UtcNow)
+        };
+        
+        await responseStream.WriteAsync(response);
     }
 }
