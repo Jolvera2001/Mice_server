@@ -9,21 +9,30 @@ public class MessageService(ILogger<MessageService> logger, ChatState chatState)
     public override async Task ConnectRequest(Connect connection, IServerStreamWriter<Message> responseStream, ServerCallContext context)
     {
         logger.LogInformation($"Connection requested from: {connection.User.Name}");
+        var content = $"Welcome to the Mice Server {connection.User.Name}";
 
-        var response = new Message
-        {
-            UserId = Guid.NewGuid().ToString(),
-            Content = $"Welcome to the Mice Server {connection.User.Name}",
-            SentDate = Timestamp.FromDateTime(DateTime.UtcNow)
-        };
+        var response = chatState.CreateMessage(content);
         
         await responseStream.WriteAsync(response);
-        chatState.AddUser(connection, responseStream);
+        var errorTcs = chatState.AddUser(connection, responseStream);
+
+        try
+        {
+            var error = await errorTcs.Task;
+            logger.LogError($"Connection error for user: {connection.User.Name}: {error.Message}");
+        }
+        catch (Exception e)
+        {
+            logger.LogInformation($"Client disconnected: {connection.User.Name}");
+        }
+        finally
+        {
+            chatState.RemoveUser(connection);
+        }
     }
 
     public override async Task<Close> BroadcastMessage(Message message, ServerCallContext context)
     {
-        logger.LogInformation($"Broadcasting message: {message}");
         await chatState.BroadcastMessage(message);
         return new Close();
     }

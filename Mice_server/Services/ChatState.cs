@@ -10,57 +10,46 @@ public class ChatState(ILogger<ChatState> logger)
     public ConcurrentDictionary<Connect, IServerStreamWriter<Message>> Users =
         new ConcurrentDictionary<Connect, IServerStreamWriter<Message>>();
 
-    public bool AddUser(Connect connection, IServerStreamWriter<Message> stream)
+    private ConcurrentDictionary<Connect, TaskCompletionSource<Exception>> _errors =
+        new ConcurrentDictionary<Connect, TaskCompletionSource<Exception>>();
+
+    public TaskCompletionSource<Exception> AddUser(Connect connection, IServerStreamWriter<Message> stream)
     {
-        bool result = Users.TryAdd(connection, stream);
-        if (result)
-        {
-            logger.LogInformation($"User {connection.User.Name} added");
-        }
-        else
-        {
-            logger.LogError($"User {connection.User.Name} failed to be added");
-        }
-        return result;
+        Users.TryAdd(connection, stream);
+        
+        var tcs = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _errors.TryAdd(connection, tcs);
+        
+        logger.LogInformation($"User {connection} connected. Total users: {Users.Count}");
+        return tcs;
     }
 
-    public bool RemoveUser(Connect connection)
+    public void RemoveUser(Connect connection)
     {
-        bool result = Users.TryRemove(connection, out _);
-        if (result)
-        {
-            logger.LogInformation($"User {connection.User.Name} removed");
-        }
-        else
-        {
-            logger.LogError($"User {connection.User.Name} failed to be removed");
-        }
-        return result;
+        Users.TryRemove(connection, out _);
+        _errors.TryRemove(connection, out _);
+        logger.LogInformation($"User {connection} disconnected. Total users: {Users.Count}");
     }
 
     public async Task BroadcastMessage(Message message)
     {
         logger.LogInformation($"Broadcasting message: {message}");
-        int successCount = 0;
-        var deadConnections = new List<Connect>();
 
-        foreach (var (connection, stream) in Users)
+        foreach (var (conn, stream) in Users)
         {
             try
             {
                 await stream.WriteAsync(message);
-                successCount++;
             }
-            catch (Exception ex)
+            catch (Exception e)
             {
-                logger.LogError($"Error while broadcasting message: {ex.Message}");
-                deadConnections.Add(connection);
-            }
-        }
+                logger.LogError(e, $"Error while broadcasting message: {e.Message}");
 
-        foreach (var connection in deadConnections)
-        {
-            RemoveUser(connection);
+                if (_errors.TryGetValue(conn, out var tcs))
+                {
+                    tcs.TrySetException(e);
+                }
+            }
         }
     }
 
