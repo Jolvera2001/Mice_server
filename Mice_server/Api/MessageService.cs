@@ -16,11 +16,8 @@ public class MessageService(ILogger<MessageService> logger, ChatState chatState)
         await responseStream.WriteAsync(response);
         var errorTcs = chatState.AddUser(connection, responseStream);
 
-        context.CancellationToken.Register(() =>
-        {
-            logger.LogInformation($"{connection.User.Name} has disconnected (detected via cancellation token)");
-            chatState.SignalClientDisconnect(connection);
-        });
+        // callback to send an error with connection once client disconnects
+        context.CancellationToken.Register(() => SignalDisconnect(connection));
 
         try
         {
@@ -41,5 +38,11 @@ public class MessageService(ILogger<MessageService> logger, ChatState chatState)
     {
         await chatState.BroadcastMessage(message);
         return new Close();
+    }
+
+    private void SignalDisconnect(Connect connection)
+    {
+        logger.LogInformation($"{connection.User.Name} has disconnected");
+        chatState.SignalClientDisconnect(connection);
     }
 }
