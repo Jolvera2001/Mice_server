@@ -31,6 +31,15 @@ public class ChatState(ILogger<ChatState> logger)
         logger.LogInformation($"User {connection} disconnected. Total users: {Users.Count}");
     }
 
+    public void SignalClientDisconnect(Connect connection)
+    {
+        if (_errors.TryRemove(connection, out var tcs))
+        {
+            logger.LogInformation($"User {connection} disconnected. Total users: {Users.Count}");
+            tcs.TrySetResult(new Exception("Client disconnected"));
+        }
+    }
+
     public async Task BroadcastMessage(Message message)
     {
         logger.LogInformation($"Broadcasting message: {message}");
@@ -59,7 +68,7 @@ public class ChatState(ILogger<ChatState> logger)
         {
             UserId = "system",
             Content = content,
-            SentDate = Timestamp.FromDateTime(DateTime.Now)
+            SentDate = Timestamp.FromDateTime(DateTime.UtcNow)
         };
     }
 }
