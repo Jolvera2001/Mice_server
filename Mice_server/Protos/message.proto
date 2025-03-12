@@ -5,7 +5,13 @@ option csharp_namespace = "Mice_server";
 package message;
 
 service MessageService {
-  rpc SendMessage(Message) returns (stream Message);
+  rpc ConnectRequest(Connect) returns (stream Message);
+  rpc BroadcastMessage(Message) returns (Close);
+}
+
+message User {
+  string id = 1;
+  string name = 2;
 }
 
 message Message {
@@ -13,6 +19,13 @@ message Message {
   string content = 2;
   google.protobuf.Timestamp sent_date = 3;
 }
+
+message Connect {
+  User user = 1;
+  bool active = 2;
+}
+
+message Close {}
 
 // can be reused later
 //message Reply {
